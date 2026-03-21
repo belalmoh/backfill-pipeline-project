@@ -1,0 +1,57 @@
+# Flink Configuration
+# https://nightlies.apache.org/flink/flink-docs-stable/docs/deployment/configured/
+
+# JobManager configuration
+jobmanager.rpc.address: flink-jobmanager
+jobmanager.rpc.port: 6123
+jobmanager.bind-host-address: 0.0.0.0
+jobmanager.web.address: 0.0.0.0
+jobmanager.web.port: 8081
+
+# TaskManager configuration
+taskmanager.numberOfTaskSlots: 2
+taskmanager.bind-host-address: 0.0.0.0
+taskmanager.host: 0.0.0.0
+taskmanager.memory.process.size: 1024m
+taskmanager.network.memory.fraction: 0.1
+taskmanager.network.memory.min: 64mb
+taskmanager.network.memory.max: 256mb
+
+# Checkpointing (Exactly-Once)
+execution.checkpointing.interval: 300000  # 5 minutes
+execution.checkpointing.mode: EXACTLY_ONCE
+execution.checkpointing.timeout: 600000
+execution.checkpointing.min-pause: 10000
+execution.checkpointing.max-concurrent-checkpoints: 1
+execution.checkpointing.externalized-checkpoint-retention: RETAIN_ON_CANCELLATION
+
+# State Backend
+state.backend: rocksdb
+state.backend.fs.checkpointdir: s3://clickstream-bronze/flink-checkpoints
+state.backend.incremental: true
+
+# Kafka Consumer
+execution.config:
+  kafka:
+    consumer:
+      isolation.level: read_committed
+      enable.auto.commit: false
+
+# S3/MinIO Configuration
+s3.access.key: minioadmin
+s3.secret.key: minioadmin123
+s3.endpoint: http://minio:9000
+s3.path.style.access: true
+
+# Parallelism
+parallelism.default: 2
+
+# Logging
+log.level: INFO
+log.exception.level: WARN
+
+# Web UI
+web.submit.enable: true
+web.refresh-interval: 5000
+web.history.cache-size: 10
+web.history.ttl: 7d
