@@ -21,6 +21,9 @@
 # Build and start all services
 docker-compose up -d --build
 
+# Initialize Airflow metadata DB and admin user
+# This runs automatically because airflow-webserver and airflow-scheduler depend on airflow-init.
+
 # Check service health
 docker-compose ps
 
@@ -34,6 +37,8 @@ docker-compose logs -f
 - **Spark Master**: http://localhost:8081
 - **Flink Dashboard**: http://localhost:8082
 - **Schema Registry**: http://localhost:8081
+
+Airflow admin credentials are provisioned by the `airflow-init` service using values from `.env`.
 
 ### 3. Initialize MinIO buckets
 ```bash

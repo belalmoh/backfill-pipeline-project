@@ -1,4 +1,4 @@
-FROM apache/spark:3.5.1-scala2.13-java17-python3-ubuntu
+FROM bitnamilegacy/spark:3.5.0-debian-12-r17
 
 USER root
 
@@ -10,7 +10,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Install Python dependencies
 RUN pip install --no-cache-dir \
-    pyspark==3.5.1 \
     boto3==1.34.34 \
     great-expectations==0.18.21 \
     delta-spark==3.1.0 \
@@ -21,4 +20,5 @@ RUN wget -q https://dl.min.io/client/mc/release/linux-amd64/mc \
     && chmod +x mc \
     && mv mc /usr/local/bin/mc
 
-USER spark
+# Run as root (no special user in this image)
+# USER root
