@@ -18,17 +18,21 @@
 
 ### 1. First-time setup
 ```bash
-# Build and start all services
-docker-compose up -d --build
+# Build and start only the core local-dev services by default
+COMPOSE_PROFILES=core docker compose up -d --build
+
+# Start more of the stack only when needed
+COMPOSE_PROFILES=core,streaming docker compose up -d
+COMPOSE_PROFILES=core,orchestration,compute docker compose up -d
 
 # Initialize Airflow metadata DB and admin user
 # This runs automatically because airflow-webserver and airflow-scheduler depend on airflow-init.
 
 # Check service health
-docker-compose ps
+COMPOSE_PROFILES=core docker compose ps
 
 # View logs
-docker-compose logs -f
+COMPOSE_PROFILES=core docker compose logs -f
 ```
 
 ### 2. Access UIs
@@ -43,15 +47,15 @@ Airflow admin credentials are provisioned by the `airflow-init` service using va
 ### 3. Initialize MinIO buckets
 ```bash
 # Create buckets via MinIO client
-docker-compose exec minio mc alias set myminio http://minio:9000 minioadmin minioadmin123
-docker-compose exec minio mc mb myminio/clickstream-bronze
-docker-compose exec minio mc mb myminio/clickstream-silver
-docker-compose exec minio mc mb myminio/clickstream-gold
+COMPOSE_PROFILES=core docker compose exec minio mc alias set myminio http://minio:9000 minioadmin minioadmin123
+COMPOSE_PROFILES=core docker compose exec minio mc mb myminio/clickstream-bronze
+COMPOSE_PROFILES=core docker compose exec minio mc mb myminio/clickstream-silver
+COMPOSE_PROFILES=core docker compose exec minio mc mb myminio/clickstream-gold
 ```
 
 ### 4. Verify PostgreSQL
 ```bash
-docker-compose exec postgres psql -U admin -d clickstream -c "SELECT COUNT(*) FROM clicks;"
+COMPOSE_PROFILES=core docker compose exec postgres psql -U admin -d clickstream -c "SELECT COUNT(*) FROM clicks;"
 ```
 
 ## Configuration Files
@@ -86,23 +90,23 @@ docker/
 
 ### Check service logs
 ```bash
-docker-compose logs <service-name>
+COMPOSE_PROFILES=core docker compose logs <service-name>
 ```
 
 ### Restart a service
 ```bash
-docker-compose restart <service-name>
+COMPOSE_PROFILES=core docker compose restart <service-name>
 ```
 
 ### Rebuild all services
 ```bash
-docker-compose up -d --build --force-recreate
+COMPOSE_PROFILES=core,streaming,orchestration,compute docker compose up -d --build --force-recreate
 ```
 
 ### Reset everything
 ```bash
-docker-compose down -v
-docker-compose up -d --build
+docker compose down -v
+COMPOSE_PROFILES=core docker compose up -d --build
 ```
 
 ### Kafka Connect plugins
@@ -114,8 +118,11 @@ curl http://localhost:8083/connector-plugins | jq
 
 ## Resource Allocation
 
-Default memory settings (adjust in `.env` for production):
-- Spark Executor: 2G
-- Spark Driver: 1G
+Default memory settings for local development can be overridden via `.env`:
+- Spark Worker: 1G
+- Spark Driver: 512M
+- Kafka Heap: 768M max
+- Kafka Connect Heap: 768M max
+- Schema Registry Heap: 384M max
 - Flink TaskManager: 1024m
 - 2 task slots per TaskManager

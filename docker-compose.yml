@@ -1,10 +1,10 @@
-version: '3.8'
-
 services:
   # ==================== DATABASE ====================
   postgres:
     image: postgres:15-alpine
     container_name: postgres
+    profiles:
+      - core
     environment:
       POSTGRES_USER: admin
       POSTGRES_PASSWORD: admin123
@@ -14,6 +14,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+    mem_limit: ${POSTGRES_MEM_LIMIT:-512m}
     networks:
       - pipeline-network
     healthcheck:
@@ -26,6 +27,8 @@ services:
   minio:
     image: minio/minio:latest
     container_name: minio
+    profiles:
+      - core
     environment:
       MINIO_ROOT_USER: minioadmin
       MINIO_ROOT_PASSWORD: minioadmin123
@@ -35,6 +38,7 @@ services:
     volumes:
       - minio_data:/data
     command: minio server /data --console-address ":9001"
+    mem_limit: ${MINIO_MEM_LIMIT:-512m}
     networks:
       - pipeline-network
     healthcheck:
@@ -47,15 +51,21 @@ services:
   zookeeper:
     image: confluentinc/cp-zookeeper:7.6.0
     container_name: zookeeper
+    profiles:
+      - streaming
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
       ZOOKEEPER_TICK_TIME: 2000
+      KAFKA_HEAP_OPTS: "${ZOOKEEPER_HEAP_OPTS:--Xms256m -Xmx512m}"
+    mem_limit: ${ZOOKEEPER_MEM_LIMIT:-768m}
     networks:
       - pipeline-network
 
   kafka:
     image: confluentinc/cp-kafka:7.6.0
     container_name: kafka
+    profiles:
+      - streaming
     depends_on:
       - zookeeper
     ports:
@@ -69,6 +79,8 @@ services:
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_HEAP_OPTS: "${KAFKA_HEAP_OPTS:--Xms256m -Xmx768m}"
+    mem_limit: ${KAFKA_MEM_LIMIT:-1g}
     networks:
       - pipeline-network
     healthcheck:
@@ -80,6 +92,8 @@ services:
   schema-registry:
     image: confluentinc/cp-schema-registry:7.6.0
     container_name: schema-registry
+    profiles:
+      - streaming
     depends_on:
       - kafka
     ports:
@@ -88,12 +102,16 @@ services:
       SCHEMA_REGISTRY_HOST_NAME: schema-registry
       SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: kafka:9092
       SCHEMA_REGISTRY_LISTENERS: http://0.0.0.0:8085
+      SCHEMA_REGISTRY_HEAP_OPTS: "${SCHEMA_REGISTRY_HEAP_OPTS:--Xms128m -Xmx384m}"
+    mem_limit: ${SCHEMA_REGISTRY_MEM_LIMIT:-512m}
     networks:
       - pipeline-network
 
   kafka-connect:
     image: confluentinc/cp-kafka-connect:7.6.0
     container_name: kafka-connect
+    profiles:
+      - streaming
     depends_on:
       - kafka
       - schema-registry
@@ -116,6 +134,8 @@ services:
       CONNECT_CONFIG_STORAGE_REPLICATION_FACTOR: 1
       CONNECT_OFFSET_STORAGE_REPLICATION_FACTOR: 1
       CONNECT_STATUS_STORAGE_REPLICATION_FACTOR: 1
+      KAFKA_HEAP_OPTS: "${KAFKA_CONNECT_HEAP_OPTS:--Xms256m -Xmx768m}"
+    mem_limit: ${KAFKA_CONNECT_MEM_LIMIT:-1g}
     command:
       - bash
       - -c
@@ -133,15 +153,18 @@ services:
       context: ./docker/airflow
       dockerfile: Dockerfile
     container_name: airflow-init
+    profiles:
+      - orchestration
     depends_on:
       postgres:
         condition: service_healthy
     environment:
-      - AIRFLOW__CORE__EXECUTOR=LocalExecutor
+      - AIRFLOW__CORE__EXECUTOR=${AIRFLOW_EXECUTOR:-SequentialExecutor}
       - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://admin:admin123@postgres/airflow
       - AIRFLOW__CORE__LOAD_EXAMPLES=False
       - AIRFLOW__WEBSERVER__SECRET_KEY=clickstream_secret_2025
       - AIRFLOW__CORE__DAGS_FOLDER=/opt/airflow/dags
+      - AIRFLOW__CORE__PARALLELISM=${AIRFLOW_PARALLELISM:-2}
       - AIRFLOW_ADMIN_USERNAME=${AIRFLOW_ADMIN_USERNAME:-admin}
       - AIRFLOW_ADMIN_PASSWORD=${AIRFLOW_ADMIN_PASSWORD:-admin}
       - AIRFLOW_ADMIN_FIRSTNAME=${AIRFLOW_ADMIN_FIRSTNAME:-Admin}
@@ -153,6 +176,7 @@ services:
       - ./airflow/plugins:/opt/airflow/plugins
       - ./src:/opt/airflow/src:ro
       - airflow-logs:/opt/airflow/logs
+    mem_limit: ${AIRFLOW_INIT_MEM_LIMIT:-768m}
     command:
       - bash
       - -c
@@ -176,15 +200,18 @@ services:
       context: ./docker/airflow
       dockerfile: Dockerfile
     container_name: airflow-webserver
+    profiles:
+      - orchestration
     depends_on:
         airflow-init:
           condition: service_completed_successfully
     environment:
-      - AIRFLOW__CORE__EXECUTOR=LocalExecutor
+      - AIRFLOW__CORE__EXECUTOR=${AIRFLOW_EXECUTOR:-SequentialExecutor}
       - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://admin:admin123@postgres/airflow
       - AIRFLOW__CORE__LOAD_EXAMPLES=False
       - AIRFLOW__WEBSERVER__SECRET_KEY=clickstream_secret_2025
       - AIRFLOW__CORE__DAGS_FOLDER=/opt/airflow/dags
+      - AIRFLOW__CORE__PARALLELISM=${AIRFLOW_PARALLELISM:-2}
     ports:
       - "8080:8080"
     volumes:
@@ -193,6 +220,7 @@ services:
       - ./airflow/plugins:/opt/airflow/plugins
       - ./src:/opt/airflow/src:ro
       - airflow-logs:/opt/airflow/logs
+    mem_limit: ${AIRFLOW_WEBSERVER_MEM_LIMIT:-1g}
     command: webserver
     healthcheck:
       test: [ "CMD", "curl", "-f", "http://localhost:8080/health" ]
@@ -207,21 +235,25 @@ services:
       context: ./docker/airflow
       dockerfile: Dockerfile
     container_name: airflow-scheduler
+    profiles:
+      - orchestration
     depends_on:
       airflow-init:
         condition: service_completed_successfully
     environment:
-      - AIRFLOW__CORE__EXECUTOR=LocalExecutor
+      - AIRFLOW__CORE__EXECUTOR=${AIRFLOW_EXECUTOR:-SequentialExecutor}
       - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://admin:admin123@postgres/airflow
       - AIRFLOW__CORE__LOAD_EXAMPLES=False
       - AIRFLOW__WEBSERVER__SECRET_KEY=clickstream_secret_2025
       - AIRFLOW__CORE__DAGS_FOLDER=/opt/airflow/dags
+      - AIRFLOW__CORE__PARALLELISM=${AIRFLOW_PARALLELISM:-2}
     volumes:
       - ./airflow/dags:/opt/airflow/dags
       - ./airflow/logs:/opt/airflow/logs
       - ./airflow/plugins:/opt/airflow/plugins
       - ./src:/opt/airflow/src:ro
       - airflow-logs:/opt/airflow/logs
+    mem_limit: ${AIRFLOW_SCHEDULER_MEM_LIMIT:-1g}
     command: scheduler
     networks:
       - pipeline-network
@@ -232,10 +264,13 @@ services:
       context: ./docker/spark
       dockerfile: Dockerfile
     container_name: spark-master
+    profiles:
+      - compute
     environment:
       SPARK_MASTER_HOST: spark-master
       SPARK_MASTER_PORT: 7077
       SPARK_MASTER_WEBUI_PORT: 8082
+      SPARK_DAEMON_MEMORY: ${SPARK_DAEMON_MEMORY:-512m}
       AWS_ACCESS_KEY_ID: minioadmin
       AWS_SECRET_ACCESS_KEY: minioadmin123
       AWS_ENDPOINT_URL: http://minio:9000
@@ -246,6 +281,7 @@ services:
       - ./docker/spark/jobs:/opt/spark/jobs
       - ./src:/opt/spark/src:ro
       - ./config:/opt/spark/config:ro
+    mem_limit: ${SPARK_MASTER_MEM_LIMIT:-1g}
     networks:
       - pipeline-network
 
@@ -254,14 +290,17 @@ services:
       context: ./docker/spark
       dockerfile: Dockerfile
     container_name: spark-worker
+    profiles:
+      - compute
     depends_on:
       - spark-master
       - minio
     environment:
       SPARK_MASTER_URL: spark://spark-master:7077
-      SPARK_WORKER_MEMORY: 2G
-      SPARK_WORKER_CORES: 2
-      SPARK_DRIVER_MEMORY: 1G
+      SPARK_WORKER_MEMORY: ${SPARK_WORKER_MEMORY:-1G}
+      SPARK_WORKER_CORES: ${SPARK_WORKER_CORES:-1}
+      SPARK_DRIVER_MEMORY: ${SPARK_DRIVER_MEMORY:-512M}
+      SPARK_DAEMON_MEMORY: ${SPARK_DAEMON_MEMORY:-512m}
       AWS_ACCESS_KEY_ID: minioadmin
       AWS_SECRET_ACCESS_KEY: minioadmin123
       AWS_ENDPOINT_URL: http://minio:9000
@@ -269,6 +308,7 @@ services:
       - ./docker/spark/jobs:/opt/spark/jobs
       - ./src:/opt/spark/src:ro
       - ./config:/opt/spark/config:ro
+    mem_limit: ${SPARK_WORKER_MEM_LIMIT:-1536m}
     command: bin/spark-class org.apache.spark.deploy.worker.Worker spark://spark-master:7077
     networks:
       - pipeline-network
@@ -277,8 +317,11 @@ services:
   redis:
     image: redis:7-alpine
     container_name: redis
+    profiles:
+      - core
     ports:
       - "6379:6379"
+    mem_limit: ${REDIS_MEM_LIMIT:-256m}
     networks:
       - pipeline-network
     healthcheck:
