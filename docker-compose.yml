@@ -278,8 +278,7 @@ services:
       - "8082:8082"
       - "7077:7077"
     volumes:
-      - ./docker/spark/jobs:/opt/spark/jobs
-      - ./src:/opt/spark/src:ro
+      - ./src/batch:/opt/spark/jobs
       - ./config:/opt/spark/config:ro
     mem_limit: ${SPARK_MASTER_MEM_LIMIT:-1g}
     networks:
@@ -305,8 +304,7 @@ services:
       AWS_SECRET_ACCESS_KEY: minioadmin123
       AWS_ENDPOINT_URL: http://minio:9000
     volumes:
-      - ./docker/spark/jobs:/opt/spark/jobs
-      - ./src:/opt/spark/src:ro
+      - ./src/batch:/opt/spark/jobs
       - ./config:/opt/spark/config:ro
     mem_limit: ${SPARK_WORKER_MEM_LIMIT:-1536m}
     command: bin/spark-class org.apache.spark.deploy.worker.Worker spark://spark-master:7077
