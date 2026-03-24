@@ -47,6 +47,10 @@ def create_spark_session():
         .config("spark.hadoop.fs.s3a.endpoint", "http://minio:9000")
         .config("spark.hadoop.fs.s3a.path.style.access", "true")
         .config("spark.sql.parquet.mergeSchema", "true")
+        .config("spark.driver.extraClassPath", "/opt/spark/jars/postgresql-42.6.0.jar")
+        .config(
+            "spark.executor.extraClassPath", "/opt/spark/jars/postgresql-42.6.0.jar"
+        )
         .getOrCreate()
     )
 

@@ -279,6 +279,7 @@ services:
       - "7077:7077"
     volumes:
       - ./src/batch:/opt/spark/jobs
+      - ./src/quality:/opt/spark/quality:ro
       - ./config:/opt/spark/config:ro
     mem_limit: ${SPARK_MASTER_MEM_LIMIT:-1g}
     networks:
@@ -305,6 +306,7 @@ services:
       AWS_ENDPOINT_URL: http://minio:9000
     volumes:
       - ./src/batch:/opt/spark/jobs
+      - ./src/quality:/opt/spark/quality:ro
       - ./config:/opt/spark/config:ro
     mem_limit: ${SPARK_WORKER_MEM_LIMIT:-1536m}
     command: bin/spark-class org.apache.spark.deploy.worker.Worker spark://spark-master:7077

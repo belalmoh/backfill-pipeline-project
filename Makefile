@@ -50,7 +50,7 @@ start:
 # Stop all services
 stop:
 	@echo "Stopping all services..."
-	docker compose down
+	COMPOSE_PROFILES=core,streaming,orchestration,compute docker compose down
 
 # Restart all services
 restart: stop start
