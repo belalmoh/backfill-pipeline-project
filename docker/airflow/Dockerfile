@@ -7,6 +7,7 @@ RUN apt-get update && \
     apt-get install -y --no-install-recommends \
     build-essential \
     openjdk-17-jre-headless \
+    procps \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
@@ -17,7 +18,10 @@ ENV PATH="${JAVA_HOME}/bin:${PATH}"
 
 USER airflow
 
-RUN pip install --no-cache-dir --user pyspark==3.5.1
+RUN pip install --no-cache-dir --user \
+    boto3==1.34.34 \
+    pyspark==3.5.0 \
+    apache-airflow-providers-apache-spark==4.1.3
 
 # Set Spark environment
 ENV SPARK_HOME=/home/airflow/.local/lib/python3.10/site-packages/pyspark

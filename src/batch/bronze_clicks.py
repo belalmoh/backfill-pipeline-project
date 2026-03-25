@@ -14,7 +14,7 @@ Usage:
 """
 
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import col, current_date, to_date, lit
+from pyspark.sql.functions import col, to_date, lit
 from pyspark.sql.types import (
     StructType,
     StructField,
@@ -104,9 +104,9 @@ def extract_clicks(spark, start_date, end_date):
     return df
 
 
-def add_metadata(df):
+def add_metadata(df, extract_date):
     """Add extraction metadata columns"""
-    df = df.withColumn("extract_date", current_date())
+    df = df.withColumn("extract_date", to_date(lit(extract_date)))
     df = df.withColumn(
         "batch_id", lit(f"batch_{datetime.now().strftime('%Y%m%d_%H%M%S')}")
     )
@@ -160,7 +160,12 @@ def main():
         df = extract_clicks(spark, args.start_date, args.end_date)
 
         # Add metadata
-        df = add_metadata(df)
+        df = add_metadata(df, args.start_date)
+
+        record_count = df.count()
+        if record_count == 0:
+            print("ℹ️ No records found for the requested extraction window")
+            return
 
         # Show sample
         print("\n📋 Sample data:")
@@ -176,7 +181,7 @@ def main():
         print("\n" + "=" * 60)
         print("✅ Bronze Extraction Complete")
         print("=" * 60)
-        print(f"📊 Records extracted: {df.count()}")
+        print(f"📊 Records extracted: {record_count}")
         print(f"📁 Output location: s3a://clickstream-bronze/clicks/")
         print(f"🏷️  Partition: extract_date={args.start_date}")
         print("=" * 60)

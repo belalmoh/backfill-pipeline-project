@@ -149,6 +149,7 @@ services:
 
   # ==================== AIRFLOW ====================
   airflow-init:
+    image: clickstream-airflow:local
     build:
       context: ./docker/airflow
       dockerfile: Dockerfile
@@ -165,6 +166,7 @@ services:
       - AIRFLOW__WEBSERVER__SECRET_KEY=clickstream_secret_2025
       - AIRFLOW__CORE__DAGS_FOLDER=/opt/airflow/dags
       - AIRFLOW__CORE__PARALLELISM=${AIRFLOW_PARALLELISM:-2}
+      - 'AIRFLOW_CONN_SPARK_DEFAULT={"conn_type":"spark","host":"spark://spark-master","port":7077,"extra":{"deploy-mode":"client"}}'
       - AIRFLOW_ADMIN_USERNAME=${AIRFLOW_ADMIN_USERNAME:-admin}
       - AIRFLOW_ADMIN_PASSWORD=${AIRFLOW_ADMIN_PASSWORD:-admin}
       - AIRFLOW_ADMIN_FIRSTNAME=${AIRFLOW_ADMIN_FIRSTNAME:-Admin}
@@ -196,6 +198,7 @@ services:
       - pipeline-network
 
   airflow-webserver:
+    image: clickstream-airflow:local
     build:
       context: ./docker/airflow
       dockerfile: Dockerfile
@@ -212,6 +215,7 @@ services:
       - AIRFLOW__WEBSERVER__SECRET_KEY=clickstream_secret_2025
       - AIRFLOW__CORE__DAGS_FOLDER=/opt/airflow/dags
       - AIRFLOW__CORE__PARALLELISM=${AIRFLOW_PARALLELISM:-2}
+      - 'AIRFLOW_CONN_SPARK_DEFAULT={"conn_type":"spark","host":"spark://spark-master","port":7077,"extra":{"deploy-mode":"client"}}'
     ports:
       - "8080:8080"
     volumes:
@@ -219,6 +223,7 @@ services:
       - ./airflow/logs:/opt/airflow/logs
       - ./airflow/plugins:/opt/airflow/plugins
       - ./src:/opt/airflow/src:ro
+      - ./src/batch:/opt/spark/jobs
       - airflow-logs:/opt/airflow/logs
     mem_limit: ${AIRFLOW_WEBSERVER_MEM_LIMIT:-1g}
     command: webserver
@@ -231,6 +236,7 @@ services:
       - pipeline-network
 
   airflow-scheduler:
+    image: clickstream-airflow:local
     build:
       context: ./docker/airflow
       dockerfile: Dockerfile
@@ -247,11 +253,13 @@ services:
       - AIRFLOW__WEBSERVER__SECRET_KEY=clickstream_secret_2025
       - AIRFLOW__CORE__DAGS_FOLDER=/opt/airflow/dags
       - AIRFLOW__CORE__PARALLELISM=${AIRFLOW_PARALLELISM:-2}
+      - 'AIRFLOW_CONN_SPARK_DEFAULT={"conn_type":"spark","host":"spark://spark-master","port":7077,"extra":{"deploy-mode":"client"}}'
     volumes:
       - ./airflow/dags:/opt/airflow/dags
       - ./airflow/logs:/opt/airflow/logs
       - ./airflow/plugins:/opt/airflow/plugins
       - ./src:/opt/airflow/src:ro
+      - ./src/batch:/opt/spark/jobs
       - airflow-logs:/opt/airflow/logs
     mem_limit: ${AIRFLOW_SCHEDULER_MEM_LIMIT:-1g}
     command: scheduler
